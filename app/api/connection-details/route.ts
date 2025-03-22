@@ -1,17 +1,29 @@
-import {
-  AccessToken,
-  AccessTokenOptions,
-  VideoGrant,
-} from "livekit-server-sdk";
+import axios from "axios";
+import { jwtDecode } from "jwt-decode";
+// import {
+//   AccessToken,
+//   AccessTokenOptions,
+//   VideoGrant,
+// } from "livekit-server-sdk";
 import { NextResponse } from "next/server";
 
 // NOTE: you are expected to define the following environment variables in `.env.local`:
 const API_KEY = process.env.LIVEKIT_API_KEY;
 const API_SECRET = process.env.LIVEKIT_API_SECRET;
 const LIVEKIT_URL = process.env.LIVEKIT_URL;
+const accessToken = process.env.ACCESSTOKEN;
+const userId = process.env.USER_ID;
 
+const axiosInstance = axios.create({ baseURL: "http://localhost:3001/api" });
 // don't cache the results
 export const revalidate = 0;
+type TokenPayload = {
+  sub: string;
+  video: {
+    room: string;
+    roomJoin: boolean;
+  };
+};
 
 export type ConnectionDetails = {
   serverUrl: string;
@@ -31,49 +43,33 @@ export async function GET() {
     if (API_SECRET === undefined) {
       throw new Error("LIVEKIT_API_SECRET is not defined");
     }
-
-    // Generate participant token
-    const participantIdentity = `voice_assistant_user_${Math.floor(Math.random() * 10_000)}`;
-    const roomName = `voice_assistant_room_${Math.floor(Math.random() * 10_000)}`;
-    const participantToken = await createParticipantToken(
-      { identity: participantIdentity },
-      roomName,
+    const response = await axiosInstance.get(
+      `/livekit-token?userId=${userId}`,
+      {
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+        },
+      }
     );
-
-    // Return connection details
-    const data: ConnectionDetails = {
-      serverUrl: LIVEKIT_URL,
-      roomName,
-      participantToken: participantToken,
-      participantName: participantIdentity,
-    };
-    const headers = new Headers({
-      "Cache-Control": "no-store",
-    });
-    return NextResponse.json(data, { headers });
+    const decoded: TokenPayload = jwtDecode(response.data.token);
+    const token = response.data.token;
+    if (decoded) {
+      const data: ConnectionDetails = {
+        serverUrl: LIVEKIT_URL,
+        roomName: decoded.video.room,
+        participantToken: token,
+        participantName: decoded.sub,
+      };
+      const headers = new Headers({
+        "Cache-Control": "no-store",
+      });
+      console.log("data: ", data);
+      return NextResponse.json(data, { headers });
+    }
   } catch (error) {
     if (error instanceof Error) {
       console.error(error);
       return new NextResponse(error.message, { status: 500 });
     }
   }
-}
-
-function createParticipantToken(
-  userInfo: AccessTokenOptions,
-  roomName: string
-) {
-  const at = new AccessToken(API_KEY, API_SECRET, {
-    ...userInfo,
-    ttl: "15m",
-  });
-  const grant: VideoGrant = {
-    room: roomName,
-    roomJoin: true,
-    canPublish: true,
-    canPublishData: true,
-    canSubscribe: true,
-  };
-  at.addGrant(grant);
-  return at.toJwt();
 }
