@@ -1,10 +1,5 @@
 import axios from "axios";
 import { jwtDecode } from "jwt-decode";
-// import {
-//   AccessToken,
-//   AccessTokenOptions,
-//   VideoGrant,
-// } from "livekit-server-sdk";
 import { NextResponse } from "next/server";
 
 // NOTE: you are expected to define the following environment variables in `.env.local`:
@@ -13,7 +8,7 @@ const API_SECRET = process.env.LIVEKIT_API_SECRET;
 const LIVEKIT_URL = process.env.LIVEKIT_URL;
 const accessToken = process.env.ACCESSTOKEN;
 const userId = process.env.USER_ID;
-
+console.log("API_KEY: ", API_KEY);
 const axiosInstance = axios.create({ baseURL: "http://localhost:3001/api" });
 // don't cache the results
 export const revalidate = 0;
